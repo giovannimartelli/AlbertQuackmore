@@ -1,6 +1,7 @@
 using ExpenseTracker.Data;
 using ExpenseTracker.Services;
 using ExpenseTracker.TelegramBot;
+using ExpenseTracker.TelegramBot.TelegramBot;
 using Microsoft.EntityFrameworkCore;
 using Telegram.Bot;
 

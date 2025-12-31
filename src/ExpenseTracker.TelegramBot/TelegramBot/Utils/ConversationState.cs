@@ -1,4 +1,4 @@
-namespace ExpenseTracker.TelegramBot;
+namespace ExpenseTracker.TelegramBot.TelegramBot.Utils;
 
 public enum ConversationStep
 {
@@ -17,6 +17,7 @@ public class ConversationState
     public int? SelectedSubCategoryId { get; set; }
     public string? SelectedSubCategoryName { get; set; }
     public string? Description { get; set; }
+    public int? LastBotMessageId { get; set; }
 
     public void Reset()
     {
@@ -26,6 +27,6 @@ public class ConversationState
         SelectedSubCategoryId = null;
         SelectedSubCategoryName = null;
         Description = null;
+        LastBotMessageId = null;
     }
 }
-
