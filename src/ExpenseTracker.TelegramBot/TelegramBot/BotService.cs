@@ -280,29 +280,9 @@ public class BotService(
         var inlineKeyboard = new InlineKeyboardMarkup(inlineRows);
         var text = "📁 *Seleziona una categoria:*";
 
-        // Se abbiamo un messaggio precedente, lo modifichiamo
-        if (state.LastBotMessageId.HasValue)
-        {
-            try
-            {
-                await botClient.EditMessageText(
-                    chatId: chat.Id,
-                    messageId: state.LastBotMessageId.Value,
-                    text: text,
-                    parseMode: ParseMode.Markdown,
-                    replyMarkup: inlineKeyboard,
-                    cancellationToken: cancellationToken);
-                return;
-            }
-            catch (ApiRequestException)
-            {
-                // Messaggio non più modificabile, ne inviamo uno nuovo
-            }
-        }
-
-        // Invia nuovo messaggio e salva l'ID
-        var sentMessage = await botClient.SendMessage(
+        var sentMessage = await botClient.TryEditMessageText(
             chatId: chat.Id,
+            messageId: state.LastBotMessageId,
             text: text,
             parseMode: ParseMode.Markdown,
             replyMarkup: inlineKeyboard,
@@ -354,31 +334,14 @@ public class BotService(
                 [InlineKeyboardButton.WithCallbackData("⬅️ Indietro", CallbackBack)],
                 [InlineKeyboardButton.WithCallbackData("🏠 Menu principale", CallbackMainMenu)]
             ]);
-
-            if (state.LastBotMessageId.HasValue)
-            {
-                try
-                {
-                    await botClient.EditMessageText(
-                        chatId: chat.Id,
-                        messageId: state.LastBotMessageId.Value,
-                        text: errorText,
-                        parseMode: ParseMode.Markdown,
-                        replyMarkup: errorKeyboard,
-                        cancellationToken: cancellationToken);
-                    return;
-                }
-                catch (ApiRequestException)
-                {
-                }
-            }
-
-            await botClient.SendMessage(
+            var message = await botClient.TryEditMessageText(
                 chatId: chat.Id,
+                messageId: state.LastBotMessageId,
                 text: errorText,
                 parseMode: ParseMode.Markdown,
                 replyMarkup: errorKeyboard,
                 cancellationToken: cancellationToken);
+            state.LastBotMessageId = message.Id;
             return;
         }
 
@@ -408,28 +371,9 @@ public class BotService(
 
         var inlineKeyboard = new InlineKeyboardMarkup(inlineRows);
         var text = $"📁 *{state.SelectedCategoryName}*\n\nSeleziona una sottocategoria:";
-
-        // Modifica il messaggio esistente
-        if (state.LastBotMessageId.HasValue)
-        {
-            try
-            {
-                await botClient.EditMessageText(
-                    chatId: chat.Id,
-                    messageId: state.LastBotMessageId.Value,
-                    text: text,
-                    parseMode: ParseMode.Markdown,
-                    replyMarkup: inlineKeyboard,
-                    cancellationToken: cancellationToken);
-                return;
-            }
-            catch (ApiRequestException)
-            {
-            }
-        }
-
-        var sentMessage = await botClient.SendMessage(
+        var sentMessage = await botClient.TryEditMessageText(
             chatId: chat.Id,
+            messageId: state.LastBotMessageId,
             text: text,
             parseMode: ParseMode.Markdown,
             replyMarkup: inlineKeyboard,
@@ -464,13 +408,14 @@ public class BotService(
                           $"📁 {state.SelectedCategoryName} > {state.SelectedSubCategoryName}\n\n" +
                           $"📝 Inserisci descrizione per la spesa: ";
 
-        await botClient.EditMessageText(
+        var message = await botClient.TryEditMessageText(
             chatId: chat.Id,
             messageId: state.LastBotMessageId!.Value,
             text: summaryText,
             parseMode: ParseMode.Markdown,
             replyMarkup: new InlineKeyboardMarkup([[InlineKeyboardButton.WithCallbackData("⬅️ Indietro", CallbackBack)]]),
             cancellationToken: cancellationToken);
+        state.LastBotMessageId = message.Id;
     }
 
     private async Task HandleDescriptionInputAsync(
@@ -483,7 +428,7 @@ public class BotService(
         state.Description = messageText;
         state.Step = ConversationStep.EnterAmount;
 
-        await botClient.EditMessageText(
+        var message = await botClient.TryEditMessageText(
             chatId: chat.Id,
             messageId: state.LastBotMessageId!.Value,
             text: $"📁 {state.SelectedCategoryName} > {state.SelectedSubCategoryName}\n" +
@@ -492,6 +437,7 @@ public class BotService(
             parseMode: ParseMode.Markdown,
             replyMarkup: new InlineKeyboardMarkup([[InlineKeyboardButton.WithCallbackData("⬅️ Indietro", CallbackBack)]]),
             cancellationToken: cancellationToken);
+        state.LastBotMessageId = message.Id;
     }
 
     private async Task HandleAmountInputAsync(
