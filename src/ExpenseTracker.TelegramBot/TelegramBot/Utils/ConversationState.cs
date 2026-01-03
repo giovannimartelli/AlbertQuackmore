@@ -1,17 +1,8 @@
 namespace ExpenseTracker.TelegramBot.TelegramBot.Utils;
 
-public enum ConversationStep
-{
-    MainMenu,
-    SelectCategory,
-    SelectSubCategory,
-    EnterDescription,
-    EnterAmount
-}
-
 public class ConversationState
 {
-    public ConversationStep Step { get; set; } = ConversationStep.MainMenu;
+    public string Step { get; set; } = Utils.MainMenuStep;
     public int? SelectedCategoryId { get; set; }
     public string? SelectedCategoryName { get; set; }
     public int? SelectedSubCategoryId { get; set; }
@@ -21,7 +12,7 @@ public class ConversationState
 
     public void Reset()
     {
-        Step = ConversationStep.MainMenu;
+        Step = Utils.MainMenuStep;
         SelectedCategoryId = null;
         SelectedCategoryName = null;
         SelectedSubCategoryId = null;

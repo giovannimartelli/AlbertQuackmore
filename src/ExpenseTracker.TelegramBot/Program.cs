@@ -1,7 +1,9 @@
+using System.Reflection;
 using ExpenseTracker.Data;
 using ExpenseTracker.Services;
 using ExpenseTracker.TelegramBot;
 using ExpenseTracker.TelegramBot.TelegramBot;
+using ExpenseTracker.TelegramBot.TelegramBot.Flows;
 using Microsoft.EntityFrameworkCore;
 using Telegram.Bot;
 
@@ -22,7 +24,24 @@ builder.Services.AddSingleton<ITelegramBotClient>(_ =>
 builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<ExpenseService>();
 
+// Auto-discover and register all FlowHandler implementations as Singleton
+// FlowHandlers are stateless (state is passed as parameter) and use IServiceScopeFactory for scoped dependencies
+var flowHandlerTypes = Assembly.GetExecutingAssembly()
+    .GetTypes()
+    .Where(t => t.IsClass && !t.IsAbstract && t.IsSubclassOf(typeof(FlowHandler)));
+
+foreach (var handlerType in flowHandlerTypes)
+{
+    builder.Services.AddSingleton(typeof(FlowHandler), handlerType);
+}
+
+// Register FlowController as Singleton (stateless, menu keyboard is built once)
+builder.Services.AddSingleton<FlowController>();
+
+// Register the new BotService that uses FlowController
 builder.Services.AddHostedService<BotService>();
+
+// builder.Services.AddHostedService<BotService>();
 
 var host = builder.Build();
 
