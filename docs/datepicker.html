@@ -151,6 +151,18 @@
         tg.enableClosingConfirmation();
 
         console.log('Telegram WebApp initialized', tg);
+        console.log('WebApp version:', tg.version);
+        console.log('WebApp initDataUnsafe:', tg.initDataUnsafe);
+        console.log('sendData available:', typeof tg.sendData === 'function');
+
+        // Show warning if WebApp wasn't opened properly
+        if (!tg.initDataUnsafe?.user) {
+            console.warn('WebApp not opened from Telegram bot - initDataUnsafe.user is missing');
+            const warning = document.createElement('div');
+            warning.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #ff3b30; color: white; padding: 10px; text-align: center; z-index: 9999; font-size: 12px;';
+            warning.textContent = '⚠️ WebApp non aperto dal bot. Usa il bottone "📅 Seleziona data" dal bot.';
+            document.body.insertBefore(warning, document.body.firstChild);
+        }
 
         // Set default to today
         const dateInput = document.getElementById('datePicker');
@@ -194,6 +206,7 @@
             console.log('sendDate called with:', selectedDate);
 
             if (!selectedDate) {
+                errorMessage.textContent = 'Seleziona una data';
                 errorMessage.classList.add('show');
                 setTimeout(() => errorMessage.classList.remove('show'), 3000);
                 return;
@@ -211,17 +224,45 @@
                 return;
             }
 
+            // Check if sendData is available
+            if (typeof tg.sendData !== 'function') {
+                console.error('tg.sendData is not available');
+                errorMessage.textContent = '❌ WebApp non aperto correttamente. Usa il bottone dal bot.';
+                errorMessage.classList.add('show');
+                return;
+            }
+
             try {
-                console.log('Sending data to Telegram:', selectedDate);
+                console.log('About to send data to Telegram:', selectedDate);
+                console.log('Telegram WebApp object:', tg);
+
                 // IMPORTANT: Disable closing confirmation before sending data
                 tg.disableClosingConfirmation();
+
+                // Visual feedback before sending
+                document.body.style.opacity = '0.5';
+                errorMessage.textContent = '📤 Invio in corso...';
+                errorMessage.style.color = '#007bff';
+                errorMessage.classList.add('show');
+
                 // Send data back to bot in ISO format
+                console.log('Calling tg.sendData()...');
                 tg.sendData(selectedDate);
-                console.log('Data sent successfully');
-                // Note: tg.sendData() automatically closes the WebApp, no need to call tg.close()
+                console.log('tg.sendData() called - waiting for WebApp to close');
+
+                // If we reach here and WebApp doesn't close, there's a problem
+                setTimeout(() => {
+                    console.error('WebApp did not close after sendData');
+                    errorMessage.textContent = '❌ Errore: il WebApp non si è chiuso. Controlla la configurazione del dominio su BotFather.';
+                    errorMessage.style.color = '#ff3b30';
+                    document.body.style.opacity = '1';
+                }, 2000);
+
             } catch (error) {
                 console.error('Error sending data:', error);
-                errorMessage.textContent = 'Errore nell\'invio: ' + error.message;
+                document.body.style.opacity = '1';
+                errorMessage.textContent = '❌ Errore: ' + error.message;
+                errorMessage.style.color = '#ff3b30';
                 errorMessage.classList.add('show');
             }
         }
