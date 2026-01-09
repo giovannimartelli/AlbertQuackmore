@@ -10,6 +10,10 @@ public class ConversationState
     public string? Description { get; set; }
     public int? LastBotMessageId { get; set; }
 
+    // Used for tag creation flow after subcategory creation
+    public int? CreatedSubCategoryId { get; set; }
+    public string? CreatedSubCategoryName { get; set; }
+
     public void Reset()
     {
         Step = Utils.MainMenuStep;
@@ -19,5 +23,7 @@ public class ConversationState
         SelectedSubCategoryName = null;
         Description = null;
         LastBotMessageId = null;
+        CreatedSubCategoryId = null;
+        CreatedSubCategoryName = null;
     }
 }

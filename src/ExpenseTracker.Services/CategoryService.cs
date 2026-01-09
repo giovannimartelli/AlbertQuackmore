@@ -37,15 +37,32 @@ public class CategoryService(AppDbContext context)
         await context.SaveChangesAsync();
     }
     
-    public async Task CreateNewSubCategoryAsync(string name, int categoryId)
+    public async Task<SubCategory> CreateNewSubCategoryAsync(string name, int categoryId)
     {
         var cat = await context.SubCategories.SingleOrDefaultAsync(c => c.Name == name && c.CategoryId == categoryId);
-        if (cat is null)
-            context.SubCategories.Add(new SubCategory
+        if (cat is not null) return cat;
+        cat = new SubCategory
+        {
+            Name = name,
+            CategoryId = categoryId
+        };
+        context.SubCategories.Add(cat);
+        await context.SaveChangesAsync();
+
+        return cat;
+    }
+
+    public async Task CreateTagAsync(string name, int subCategoryId)
+    {
+        var existingTag = await context.Tags.SingleOrDefaultAsync(t => t.Name == name && t.SubCategoryId == subCategoryId);
+        if (existingTag is null)
+        {
+            context.Tags.Add(new Tag
             {
                 Name = name,
-                CategoryId = categoryId
+                SubCategoryId = subCategoryId
             });
-        await context.SaveChangesAsync();
+            await context.SaveChangesAsync();
+        }
     }
 }

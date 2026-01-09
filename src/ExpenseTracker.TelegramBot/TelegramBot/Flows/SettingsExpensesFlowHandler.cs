@@ -26,11 +26,16 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
     private const string CallbackAddCategory = "settings_addcat";
     private const string CallbackAddSubCategory = "settings_addsub";
     private const string CallbackPickCategory = "settings_pickcat";
+    private const string CallbackAddTag = "settings_addtag";
+    private const string CallbackSkipTags = "settings_skiptags";
+    private const string CallbackDoneTags = "settings_donetags";
 
     private const string StepSelectAction = "SettingsExpenses_SelectAction";
     private const string StepAddCategory = "SettingsExpenses_AddCategory";
     private const string StepSelectCategoryForSub = "SettingsExpenses_SelectCategoryForSub";
     private const string StepAddSubCategory = "SettingsExpenses_AddSubCategory";
+    private const string StepAskAddTag = "SettingsExpenses_AskAddTag";
+    private const string StepAddTag = "SettingsExpenses_AddTag";
 
     public override string? GetMenuItemInfo() => null;
 
@@ -53,6 +58,8 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             CallbackSettingsExpenses => callbackData == SettingsCallbackData,
             CallbackAddCategory or CallbackAddSubCategory => state.Step == StepSelectAction,
             CallbackPickCategory => state.Step == StepSelectCategoryForSub,
+            CallbackAddTag or CallbackSkipTags => state.Step == StepAskAddTag,
+            CallbackDoneTags => state.Step == StepAddTag,
             _ => false
         };
     }
@@ -114,11 +121,26 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
                 state.Step = StepAddSubCategory;
                 await AskForSubCategoryNameAsync(botClient, chat, state, cancellationToken);
                 return;
+
+            case CallbackAddTag:
+                state.Step = StepAddTag;
+                await AskForTagNameAsync(botClient, chat, state, cancellationToken);
+                return;
+
+            case CallbackSkipTags:
+            case CallbackDoneTags:
+                var createdSubCatName = state.CreatedSubCategoryName;
+                var createdForCat = state.SelectedCategoryName;
+                state.Reset();
+                state.Step = StepSelectAction;
+                await ShowActionsAsync(botClient, chat, state, cancellationToken,
+                    $"✅ Sottocategoria *{createdSubCatName}* creata in *{createdForCat}*");
+                return;
         }
     }
 
     public override bool CanHandleTextInput(ConversationState state) =>
-        state.Step is StepAddCategory or StepAddSubCategory;
+        state.Step is StepAddCategory or StepAddSubCategory or StepAddTag;
 
     public override async Task HandleTextInputAsync(
         ITelegramBotClient botClient,
@@ -153,18 +175,40 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
 
             using var scope = scopeFactory.CreateScope();
             var categoryService = scope.ServiceProvider.GetRequiredService<CategoryService>();
-            await categoryService.CreateNewSubCategoryAsync(text, state.SelectedCategoryId.Value);
+            var createdSubCategory = await categoryService.CreateNewSubCategoryAsync(text, state.SelectedCategoryId.Value);
 
             logger.LogInformation("Created subcategory {Name} under category {CategoryId}", text, state.SelectedCategoryId);
-            var createdFor = state.SelectedCategoryName;
-            state.Reset();
-            state.Step = StepSelectAction;
-            await ShowActionsAsync(botClient, chat, state, cancellationToken, $"✅ Sottocategoria *{text}* creata in *{createdFor}*");
+
+            // Save subcategory info for tag creation flow
+            state.CreatedSubCategoryId = createdSubCategory.Id;
+            state.CreatedSubCategoryName = createdSubCategory.Name;
+            state.Step = StepAskAddTag;
+            await AskIfAddTagsAsync(botClient, chat, state, cancellationToken);
+        }
+        else if (state.Step == StepAddTag)
+        {
+            if (state.CreatedSubCategoryId is null)
+            {
+                await botClient.SendMessage(chat.Id, "❌ Errore: sottocategoria non trovata.", cancellationToken: cancellationToken);
+                state.Reset();
+                state.Step = StepSelectAction;
+                await ShowActionsAsync(botClient, chat, state, cancellationToken);
+                return;
+            }
+
+            using var scope = scopeFactory.CreateScope();
+            var categoryService = scope.ServiceProvider.GetRequiredService<CategoryService>();
+            await categoryService.CreateTagAsync(text, state.CreatedSubCategoryId.Value);
+
+            logger.LogInformation("Created tag {Name} for subcategory {SubCategoryId}", text, state.CreatedSubCategoryId);
+
+            // Show option to add more tags or finish
+            await ShowTagAddedAsync(botClient, chat, state, text, cancellationToken);
         }
     }
 
     public override bool CanHandleBack(ConversationState state) =>
-        state.Step is StepSelectAction or StepAddCategory or StepSelectCategoryForSub or StepAddSubCategory;
+        state.Step is StepSelectAction or StepAddCategory or StepSelectCategoryForSub or StepAddSubCategory or StepAskAddTag or StepAddTag;
 
     public override async Task<bool> HandleBackAsync(
         ITelegramBotClient botClient,
@@ -188,6 +232,16 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             case StepAddSubCategory:
                 state.Step = StepSelectCategoryForSub;
                 await ShowCategoriesForSubAsync(botClient, chat, state, cancellationToken);
+                return true;
+            case StepAskAddTag:
+            case StepAddTag:
+                // When going back from tag flow, finish with subcategory creation confirmation
+                var createdSubCatName = state.CreatedSubCategoryName;
+                var createdForCat = state.SelectedCategoryName;
+                state.Reset();
+                state.Step = StepSelectAction;
+                await ShowActionsAsync(botClient, chat, state, cancellationToken,
+                    $"✅ Sottocategoria *{createdSubCatName}* creata in *{createdForCat}*");
                 return true;
             default:
                 return false;
@@ -287,6 +341,74 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             state.LastBotMessageId,
             $"✏️ Inserisci il nome della nuova sottocategoria per *{state.SelectedCategoryName}*:",
             ParseMode.Markdown,
+            keyboard,
+            cancellationToken);
+
+        state.LastBotMessageId = msg.MessageId;
+    }
+
+    private async Task AskIfAddTagsAsync(
+        ITelegramBotClient botClient,
+        Chat chat,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
+        var keyboard = new InlineKeyboardMarkup([
+            [Utils.Utils.ButtonWithCallbackdata("➕ Aggiungi tag", CallbackAddTag, "start")],
+            [Utils.Utils.ButtonWithCallbackdata("⏭️ Salta", CallbackSkipTags, "skip")],
+            [Utils.Utils.MainMenu]
+        ]);
+
+        var msg = await botClient.TryEditMessageText(
+            chat.Id,
+            state.LastBotMessageId,
+            $"✅ Sottocategoria *{state.CreatedSubCategoryName}* creata\\!\n\nVuoi aggiungere dei tag?",
+            ParseMode.MarkdownV2,
+            keyboard,
+            cancellationToken);
+
+        state.LastBotMessageId = msg.MessageId;
+    }
+
+    private async Task AskForTagNameAsync(
+        ITelegramBotClient botClient,
+        Chat chat,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
+        var keyboard = new InlineKeyboardMarkup([
+            [Utils.Utils.Back],
+            [Utils.Utils.MainMenu]
+        ]);
+
+        var msg = await botClient.TryEditMessageText(
+            chat.Id,
+            state.LastBotMessageId,
+            $"🏷️ Inserisci il nome del tag per *{state.CreatedSubCategoryName}*:",
+            ParseMode.Markdown,
+            keyboard,
+            cancellationToken);
+
+        state.LastBotMessageId = msg.MessageId;
+    }
+
+    private async Task ShowTagAddedAsync(
+        ITelegramBotClient botClient,
+        Chat chat,
+        ConversationState state,
+        string tagName,
+        CancellationToken cancellationToken)
+    {
+        var keyboard = new InlineKeyboardMarkup([
+            [Utils.Utils.ButtonWithCallbackdata("✅ Fatto", CallbackDoneTags, "done")],
+            [Utils.Utils.MainMenu]
+        ]);
+
+        var msg = await botClient.TryEditMessageText(
+            chat.Id,
+            state.LastBotMessageId,
+            $"✅ Tag *{tagName}* aggiunto\\!\n\nVuoi aggiungere un altro tag?",
+            ParseMode.MarkdownV2,
             keyboard,
             cancellationToken);
 
