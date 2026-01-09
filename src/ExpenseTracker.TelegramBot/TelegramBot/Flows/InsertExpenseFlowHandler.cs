@@ -2,7 +2,6 @@ using System.Globalization;
 using ExpenseTracker.Services;
 using ExpenseTracker.TelegramBot.TelegramBot.Utils;
 using Telegram.Bot;
-using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -198,31 +197,13 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
         var keyboard = new InlineKeyboardMarkup(buttons);
         var text = "📁 *Select a category:*";
 
-        if (state.LastBotMessageId.HasValue)
-        {
-            try
-            {
-                await botClient.EditMessageText(
-                    chatId: chat.Id,
-                    messageId: state.LastBotMessageId.Value,
-                    text: text,
-                    parseMode: ParseMode.Markdown,
-                    replyMarkup: keyboard,
-                    cancellationToken: cancellationToken);
-                return;
-            }
-            catch (ApiRequestException)
-            {
-                // Message can no longer be edited, sending a new one
-            }
-        }
-
-        var msg = await botClient.SendMessage(
-            chatId: chat.Id,
-            text: text,
-            parseMode: ParseMode.Markdown,
-            replyMarkup: keyboard,
-            cancellationToken: cancellationToken);
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
+            chat.Id,
+            state,
+            text,
+            ParseMode.Markdown,
+            keyboard,
+            cancellationToken);
 
         state.LastBotMessageId = msg.MessageId;
     }
@@ -246,26 +227,15 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
         var keyboard = new InlineKeyboardMarkup(buttons);
         var text = $"📁 *{state.SelectedCategoryName}*\n\n📂 Select a subcategory:";
 
-        try
-        {
-            await botClient.EditMessageText(
-                chatId: chat.Id,
-                messageId: state.LastBotMessageId!.Value,
-                text: text,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: keyboard,
-                cancellationToken: cancellationToken);
-        }
-        catch (ApiRequestException)
-        {
-            var msg = await botClient.SendMessage(
-                chatId: chat.Id,
-                text: text,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: keyboard,
-                cancellationToken: cancellationToken);
-            state.LastBotMessageId = msg.MessageId;
-        }
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
+            chat.Id,
+            state,
+            text,
+            ParseMode.Markdown,
+            keyboard,
+            cancellationToken);
+
+        state.LastBotMessageId = msg.MessageId;
     }
 
     private async Task AskForDescriptionAsync(
@@ -282,26 +252,15 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
         var text = $"📁 *{state.SelectedCategoryName}* > *{state.SelectedSubCategoryName}*\n\n" +
                    "📝 Enter a description for the expense:";
 
-        try
-        {
-            await botClient.EditMessageText(
-                chatId: chat.Id,
-                messageId: state.LastBotMessageId!.Value,
-                text: text,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: keyboard,
-                cancellationToken: cancellationToken);
-        }
-        catch (ApiRequestException)
-        {
-            var msg = await botClient.SendMessage(
-                chatId: chat.Id,
-                text: text,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: keyboard,
-                cancellationToken: cancellationToken);
-            state.LastBotMessageId = msg.MessageId;
-        }
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
+            chat.Id,
+            state,
+            text,
+            ParseMode.Markdown,
+            keyboard,
+            cancellationToken);
+
+        state.LastBotMessageId = msg.MessageId;
     }
 
     private async Task AskForAmountAsync(
@@ -319,26 +278,15 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
                    $"📝 {state.Description}\n\n" +
                    "💰 Enter the amount (e.g., 12.50):";
 
-        try
-        {
-            await botClient.EditMessageText(
-                chatId: chat.Id,
-                messageId: state.LastBotMessageId!.Value,
-                text: text,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: keyboard,
-                cancellationToken: cancellationToken);
-        }
-        catch (ApiRequestException)
-        {
-            var msg = await botClient.SendMessage(
-                chatId: chat.Id,
-                text: text,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: keyboard,
-                cancellationToken: cancellationToken);
-            state.LastBotMessageId = msg.MessageId;
-        }
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
+            chat.Id,
+            state,
+            text,
+            ParseMode.Markdown,
+            keyboard,
+            cancellationToken);
+
+        state.LastBotMessageId = msg.MessageId;
     }
 
     private async Task HandleAmountInputAsync(

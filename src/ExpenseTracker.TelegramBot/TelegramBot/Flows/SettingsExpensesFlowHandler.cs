@@ -262,9 +262,9 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             [Utils.Utils.MainMenu]
         ]);
 
-        var msg = await botClient.TryEditMessageText(
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
             chat.Id,
-            state.LastBotMessageId,
+            state,
             headerOverride ?? "⚙️ *Impostazioni spese*",
             ParseMode.Markdown,
             keyboard,
@@ -284,9 +284,9 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             [Utils.Utils.MainMenu]
         ]);
 
-        var msg = await botClient.TryEditMessageText(
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
             chat.Id,
-            state.LastBotMessageId,
+            state,
             "✏️ Inserisci il nome della nuova categoria:",
             ParseMode.Markdown,
             keyboard,
@@ -314,9 +314,9 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
 
         var keyboard = new InlineKeyboardMarkup(buttons);
 
-        var msg = await botClient.TryEditMessageText(
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
             chat.Id,
-            state.LastBotMessageId,
+            state,
             "📁 Seleziona la categoria per la nuova sottocategoria:",
             ParseMode.Markdown,
             keyboard,
@@ -336,9 +336,9 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             [Utils.Utils.MainMenu]
         ]);
 
-        var msg = await botClient.TryEditMessageText(
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
             chat.Id,
-            state.LastBotMessageId,
+            state,
             $"✏️ Inserisci il nome della nuova sottocategoria per *{state.SelectedCategoryName}*:",
             ParseMode.Markdown,
             keyboard,
@@ -359,9 +359,9 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             [Utils.Utils.MainMenu]
         ]);
 
-        var msg = await botClient.TryEditMessageText(
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
             chat.Id,
-            state.LastBotMessageId,
+            state,
             $"✅ Sottocategoria *{state.CreatedSubCategoryName}* creata\\!\n\nVuoi aggiungere dei tag?",
             ParseMode.MarkdownV2,
             keyboard,
@@ -381,9 +381,9 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             [Utils.Utils.MainMenu]
         ]);
 
-        var msg = await botClient.TryEditMessageText(
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
             chat.Id,
-            state.LastBotMessageId,
+            state,
             $"🏷️ Inserisci il nome del tag per *{state.CreatedSubCategoryName}*:",
             ParseMode.Markdown,
             keyboard,
@@ -404,9 +404,9 @@ public class ExpensesFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Expe
             [Utils.Utils.MainMenu]
         ]);
 
-        var msg = await botClient.TryEditMessageText(
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
             chat.Id,
-            state.LastBotMessageId,
+            state,
             $"✅ Tag *{tagName}* aggiunto\\!\n\nVuoi aggiungere un altro tag?",
             ParseMode.MarkdownV2,
             keyboard,

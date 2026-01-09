@@ -9,6 +9,16 @@ public class ConversationState
     public string? SelectedSubCategoryName { get; set; }
     public string? Description { get; set; }
     public int? LastBotMessageId { get; set; }
+    
+    /// <summary>
+    /// Stores the ID of the main menu message to prevent it from being edited or deleted by sub-flows.
+    /// </summary>
+    public int? MainMenuMessageId { get; set; }
+    
+    /// <summary>
+    /// Stores the message IDs of all messages sent during a sub-flow that are candidates for deletion.
+    /// </summary>
+    public List<int> FlowMessageIds { get; set; } = new();
 
     // Used for tag creation flow after subcategory creation
     public int? CreatedSubCategoryId { get; set; }
@@ -25,5 +35,34 @@ public class ConversationState
         LastBotMessageId = null;
         CreatedSubCategoryId = null;
         CreatedSubCategoryName = null;
+        // Note: MainMenuMessageId and FlowMessageIds are NOT reset here
+        // They are managed separately by the flow cleanup logic
+    }
+    
+    /// <summary>
+    /// Tracks a message ID for later deletion when returning to main menu.
+    /// </summary>
+    public void TrackFlowMessage(int messageId)
+    {
+        if (!FlowMessageIds.Contains(messageId))
+        {
+            FlowMessageIds.Add(messageId);
+        }
+    }
+    
+    /// <summary>
+    /// Clears all tracked flow message IDs after they have been deleted.
+    /// </summary>
+    public void ClearFlowMessages()
+    {
+        FlowMessageIds.Clear();
+    }
+    
+    /// <summary>
+    /// Resets the LastBotMessageId to point to the main menu message.
+    /// </summary>
+    public void ResetToMainMenu()
+    {
+        LastBotMessageId = MainMenuMessageId;
     }
 }

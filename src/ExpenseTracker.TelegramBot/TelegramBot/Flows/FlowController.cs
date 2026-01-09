@@ -1,5 +1,6 @@
 using ExpenseTracker.TelegramBot.TelegramBot.Utils;
 using Telegram.Bot;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -38,6 +39,38 @@ public class FlowController
     }
 
     /// <summary>
+    /// Deletes all tracked flow messages and clears the list.
+    /// This should be called when returning to the main menu.
+    /// </summary>
+    public async Task DeleteFlowMessagesAsync(
+        ITelegramBotClient botClient,
+        long chatId,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
+        if (state.FlowMessageIds.Count == 0)
+            return;
+
+        _logger.LogInformation("Deleting {Count} flow messages for chat {ChatId}", state.FlowMessageIds.Count, chatId);
+
+        foreach (var messageId in state.FlowMessageIds)
+        {
+            try
+            {
+                await botClient.DeleteMessage(chatId, messageId, cancellationToken);
+                _logger.LogDebug("Deleted flow message {MessageId}", messageId);
+            }
+            catch (ApiRequestException ex)
+            {
+                _logger.LogDebug("Could not delete flow message {MessageId}: {Error}", messageId, ex.Message);
+            }
+        }
+
+        state.ClearFlowMessages();
+        state.ResetToMainMenu();
+    }
+
+    /// <summary>
     /// Handles a text message from the user.
     /// </summary>
     public async Task HandleTextMessageAsync(
@@ -61,7 +94,8 @@ public class FlowController
         if (menuHandler != null)
         {
             _logger.LogInformation("Menu command '{Command}' handled by {HandlerType}", text, menuHandler.GetType().Name);
-            await DeleteLastBotMessage(botClient, chat, state, cancellationToken);
+            // Delete any existing flow messages before starting a new flow
+            await DeleteFlowMessagesAsync(botClient, chat.Id, state, cancellationToken);
             state.Reset();
             await menuHandler.HandleMenuSelectionAsync(botClient, chat, state, cancellationToken);
             return;
@@ -79,8 +113,9 @@ public class FlowController
 
         // No handler found
         _logger.LogWarning("No handler found for text '{Text}' in step {Step}", text, state.Step);
-        await botClient.SendMessage(
+        await botClient.SendFlowMessageAsync(
             chatId: chat.Id,
+            state,
             text: "❓ I didn't understand. Use /start to get started.",
             cancellationToken: cancellationToken);
     }
@@ -141,18 +176,25 @@ public class FlowController
         bool isCommand,
         CancellationToken cancellationToken)
     {
-        await DeleteLastBotMessage(botClient, chat, state, cancellationToken);
-        state.Reset();
-        if (isCommand)
+        // Delete all flow messages before returning to main menu
+        await DeleteFlowMessagesAsync(botClient, chat.Id, state, cancellationToken);
+        const string text = "👋 *Main Menu*\n\nChoose an operation:";
+        if (isCommand || state.MainMenuMessageId == null)
         {
-            const string text = "👋 *Main Menu*\n\nChoose an operation:";
-            await botClient.SendMessage(
+            // Send a new main menu message (on /start command or if no main menu exists)
+            var msg = await botClient.SendMessage(
                 chatId: chat.Id,
                 text: text,
                 parseMode: ParseMode.Markdown,
                 replyMarkup: _mainMenuKeyboard,
                 cancellationToken: cancellationToken);
-        }
+
+            // Store the main menu message ID
+            state.MainMenuMessageId = msg.MessageId;
+            state.LastBotMessageId = msg.MessageId;
+        }        
+        state.Reset();
+
     }
 
     /// <summary>
@@ -181,12 +223,5 @@ public class FlowController
 
         // No handler could handle the back action, return to main menu
         await ShowMainMenuAsync(botClient, chat, state, false, cancellationToken);
-    }
-
-    private async Task DeleteLastBotMessage(ITelegramBotClient botClient, Chat chat, ConversationState state, CancellationToken cancellationToken = default)
-    {
-        if (state.LastBotMessageId is not null)
-            await botClient.DeleteMessage(chat.Id, state.LastBotMessageId.Value, cancellationToken);
-        state.LastBotMessageId = null;
     }
 }

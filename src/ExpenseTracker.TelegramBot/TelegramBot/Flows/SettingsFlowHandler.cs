@@ -93,9 +93,9 @@ public class SettingsFlowHandler(IServiceProvider serviceProvider, ILogger<Setti
         buttons.Add([Utils.Utils.MainMenu]);
         var keyboard =  new InlineKeyboardMarkup(buttons);
 
-        var msg = await botClient.TryEditMessageText(
+        var msg = await botClient.TryEditOrSendFlowMessageAsync(
             chat.Id,
-            state.LastBotMessageId,
+            state,
             "⚙️ *Impostazioni*\nSeleziona una sezione:",
             ParseMode.Markdown,
             keyboard,
