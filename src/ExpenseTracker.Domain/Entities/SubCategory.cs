@@ -15,6 +15,7 @@ public class SubCategory
 
     public virtual Category Category { get; set; } = null!;
     public virtual ICollection<Expense> Expenses { get; set; } = [];
+    public virtual ICollection<Tag> Tags { get; set; } = new List<Tag>();
 
     #endregion
 }

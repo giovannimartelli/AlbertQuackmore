@@ -97,13 +97,14 @@ namespace ExpenseTracker.Data.Migrations
                     b.Property<int>("SubCategoryId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Tags")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int?>("TagId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("SubCategoryId");
+
+                    b.HasIndex("TagId");
 
                     b.ToTable("Expenses", (string)null);
                 });
@@ -133,6 +134,28 @@ namespace ExpenseTracker.Data.Migrations
                     b.ToTable("SubCategories", (string)null);
                 });
 
+            modelBuilder.Entity("ExpenseTracker.Domain.Entities.Tag", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SubCategoryId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubCategoryId");
+
+                    b.ToTable("Tags");
+                });
+
             modelBuilder.Entity("ExpenseTracker.Domain.Entities.Budget", b =>
                 {
                     b.HasOne("ExpenseTracker.Domain.Entities.SubCategory", "SubCategory")
@@ -152,7 +175,14 @@ namespace ExpenseTracker.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("ExpenseTracker.Domain.Entities.Tag", "Tag")
+                        .WithMany("Expenses")
+                        .HasForeignKey("TagId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("SubCategory");
+
+                    b.Navigation("Tag");
                 });
 
             modelBuilder.Entity("ExpenseTracker.Domain.Entities.SubCategory", b =>
@@ -166,12 +196,30 @@ namespace ExpenseTracker.Data.Migrations
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("ExpenseTracker.Domain.Entities.Tag", b =>
+                {
+                    b.HasOne("ExpenseTracker.Domain.Entities.SubCategory", "SubCategory")
+                        .WithMany("Tags")
+                        .HasForeignKey("SubCategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SubCategory");
+                });
+
             modelBuilder.Entity("ExpenseTracker.Domain.Entities.Category", b =>
                 {
                     b.Navigation("Children");
                 });
 
             modelBuilder.Entity("ExpenseTracker.Domain.Entities.SubCategory", b =>
+                {
+                    b.Navigation("Expenses");
+
+                    b.Navigation("Tags");
+                });
+
+            modelBuilder.Entity("ExpenseTracker.Domain.Entities.Tag", b =>
                 {
                     b.Navigation("Expenses");
                 });

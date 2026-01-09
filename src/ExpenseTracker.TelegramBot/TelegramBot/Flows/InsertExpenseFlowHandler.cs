@@ -373,7 +373,7 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
                 description: state.Description ?? throw new InvalidOperationException("Description cannot be null"),
                 notes: null,
                 performedBy: chat.Username ?? chat.Id.ToString(),
-                tags: []);
+                tagId: null);
 
             logger.LogInformation("Expense created: {Amount} - {Description}", amount, state.Description);
 

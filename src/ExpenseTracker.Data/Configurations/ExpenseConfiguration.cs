@@ -21,13 +21,10 @@ public class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
             .HasForeignKey(e => e.SubCategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.Property(e => e.Tags)
-            .HasConversion(
-                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
-                v => JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null) ?? new List<string>())
-            .Metadata.SetValueComparer(new ValueComparer<List<string>>(
-                (l1, l2) => l1 != null && l2 != null && l1.SequenceEqual(l2),
-                l => l.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-                l => l.ToList()));
+        builder.HasOne(e => e.Tag)
+            .WithMany(t => t.Expenses)
+            .HasForeignKey(e => e.TagId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

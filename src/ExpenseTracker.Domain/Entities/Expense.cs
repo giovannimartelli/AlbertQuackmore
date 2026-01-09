@@ -11,14 +11,15 @@ public class Expense
     public required DateTime CreatedAt { get; set; }
     public required string Description { get; set; }
     public required string? Notes { get; set; }
+    public int? TagId { get; set; }
     public required string PerformedBy { get; set; }
-    public required List<string> Tags { get; set; } = [];
 
     #endregion
 
     #region Navigation Properties
 
     public virtual SubCategory SubCategory { get; set; } = null!;
+    public virtual Tag? Tag { get; set; }
 
     #endregion
 }

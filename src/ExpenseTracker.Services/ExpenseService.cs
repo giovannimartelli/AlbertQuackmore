@@ -6,7 +6,7 @@ namespace ExpenseTracker.Services;
 
 public class ExpenseService(AppDbContext context)
 {
-    public async Task CreateExpenseAsync(int subCategoryId, decimal amount, string description, string? notes, string performedBy, List<string> tags)
+    public async Task CreateExpenseAsync(int subCategoryId, decimal amount, string description, string? notes, string performedBy, int? tagId)
     {
         var expense = new Expense
         {
@@ -14,7 +14,7 @@ public class ExpenseService(AppDbContext context)
             Amount = amount,
             Description = description,
             CreatedAt = DateTime.UtcNow,
-            Tags = tags,
+            TagId = tagId,
             Notes = notes,
             PerformedBy = performedBy
         };
