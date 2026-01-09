@@ -1,4 +1,3 @@
-using ExpenseTracker.Services;
 using ExpenseTracker.TelegramBot.TelegramBot.Utils;
 using Telegram.Bot;
 using Telegram.Bot.Types;
@@ -11,23 +10,14 @@ namespace ExpenseTracker.TelegramBot.TelegramBot.Flows;
 /// Settings flow that acts as a menu and hosts settings subflows.
 /// Currently supports expense settings: add category and add subcategory.
 /// </summary>
-public class SettingsFlowHandler(IServiceScopeFactory scopeFactory, ILogger<SettingsFlowHandler> logger) : FlowHandler
+public class SettingsFlowHandler(IServiceProvider serviceProvider, ILogger<SettingsFlowHandler> logger) : FlowHandler
 {
+    public const string SettingsRootStep = "Settings_Root";
     private const string MenuCommandText = "⚙️ Settings";
     
-    private const string SettingsRootStep = "Settings_Root";
-    private const string SettingsExpensesStep = "Settings_Expenses";
-    private const string AddCategoryStep = "Settings_AddCategory";
-    private const string SelectCategoryForSubStep = "Settings_SelectCategoryForSub";
-    private const string AddSubCategoryStep = "Settings_AddSubCategory";
+    private List<ISubFlow> SubFlows => serviceProvider.GetServices<FlowHandler>().OfType<ISubFlow>().ToList();
 
-    private const string CallbackSettingsRoot = "settings_root";
-    private const string CallbackSettingsExpenses = "settings_expenses";
-    private const string CallbackAddCategory = "settings_addcat";
-    private const string CallbackAddSubCategory = "settings_addsub";
-    private const string CallbackPickCategory = "settings_pickcat";
-
-    public override string? GetMenuItemInfo() => MenuCommandText;
+    public override string GetMenuItemInfo() => MenuCommandText;
     public override bool CanHandleMenuCommand(string command) => command == MenuCommandText;
 
     public override async Task HandleMenuSelectionAsync(
@@ -43,15 +33,8 @@ public class SettingsFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Sett
 
     public override bool CanHandleCallback(string callbackName, string callbackData, ConversationState state)
     {
-        return callbackName switch
-        {
-            CallbackSettingsRoot => true,
-            CallbackSettingsExpenses => true,
-            CallbackAddCategory => state.Step is SettingsExpensesStep or AddCategoryStep,
-            CallbackAddSubCategory => state.Step is SettingsExpensesStep or SelectCategoryForSubStep or AddSubCategoryStep,
-            CallbackPickCategory => state.Step is SelectCategoryForSubStep,
-            _ => false
-        };
+        // Delegate to subflows only when we are in settings root
+        return state.Step == SettingsRootStep && SubFlows.Any(f => f.SettingsCallbackName == callbackName && f.SettingsCallbackData == callbackData);
     }
 
     public override async Task HandleCallbackAsync(
@@ -64,103 +47,24 @@ public class SettingsFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Sett
     {
         var chat = callbackQuery.Message!.Chat;
         await botClient.AnswerCallbackQuery(callbackQuery.Id, cancellationToken: cancellationToken);
-
-        switch (callbackName)
+        
+        var targetSubFlow = SubFlows.FirstOrDefault(f => f.SettingsCallbackName == callbackName && f.SettingsCallbackData == callbackData);
+        if (targetSubFlow != null)
         {
-            case CallbackSettingsRoot:
-                state.Step = SettingsRootStep;
-                await ShowSettingsRootAsync(botClient, chat, state, cancellationToken);
-                return;
-
-            case CallbackSettingsExpenses:
-                if (callbackData == "expenses")
-                {
-                    state.Step = SettingsExpensesStep;
-                    await ShowExpensesSettingsAsync(botClient, chat, state, "⚙️ *Impostazioni spese*", cancellationToken);
-                }
-                return;
-
-            case CallbackAddCategory:
-                state.Step = AddCategoryStep;
-                await AskForCategoryNameAsync(botClient, chat, state, cancellationToken);
-                return;
-
-            case CallbackAddSubCategory:
-                state.Step = SelectCategoryForSubStep;
-                await ShowCategoriesForSubAsync(botClient, chat, state, cancellationToken);
-                return;
-
-            case CallbackPickCategory:
-                var categoryId = int.Parse(callbackData);
-                using (var scope = scopeFactory.CreateScope())
-                {
-                    var categoryService = scope.ServiceProvider.GetRequiredService<CategoryService>();
-                    var category = await categoryService.GetCategoryByIdAsync(categoryId);
-                    if (category is null)
-                    {
-                        await botClient.SendMessage(chat.Id, "❌ Categoria non trovata.", cancellationToken: cancellationToken);
-                        return;
-                    }
-
-                    state.SelectedCategoryId = category.Id;
-                    state.SelectedCategoryName = category.Name;
-                }
-
-                state.Step = AddSubCategoryStep;
-                await AskForSubCategoryNameAsync(botClient, chat, state, cancellationToken);
-                return;
+            state.Step = targetSubFlow.SettingsEntryStep;
+            await targetSubFlow.StartFromSettingsRootAsync(botClient, chat, state, cancellationToken);
         }
     }
 
-    public override bool CanHandleTextInput(ConversationState state) =>
-        state.Step is AddCategoryStep or AddSubCategoryStep;
+    public override bool CanHandleTextInput(ConversationState state) => false;
 
-    public override async Task HandleTextInputAsync(
+    public override Task HandleTextInputAsync(
         ITelegramBotClient botClient,
         Message message,
         ConversationState state,
-        CancellationToken cancellationToken)
-    {
-        var chat = message.Chat;
-        var text = message.Text!.Trim();
+        CancellationToken cancellationToken) => Task.CompletedTask;
 
-        if (state.Step == AddCategoryStep)
-        {
-            using var scope = scopeFactory.CreateScope();
-            var categoryService = scope.ServiceProvider.GetRequiredService<CategoryService>();
-            await categoryService.CreateNewCategoryAsync(text);
-
-            logger.LogInformation("Created category {Name}", text);
-            state.SelectedCategoryId = null;
-            state.SelectedCategoryName = null;
-            state.Step = SettingsExpensesStep;
-            await ShowExpensesSettingsAsync(botClient, chat, state, $"✅ Categoria *{text}* creata", cancellationToken);
-        }
-        else if (state.Step == AddSubCategoryStep)
-        {
-            if (state.SelectedCategoryId is null)
-            {
-                await botClient.SendMessage(chat.Id, "❌ Seleziona prima una categoria.", cancellationToken: cancellationToken);
-                state.Step = SelectCategoryForSubStep;
-                await ShowCategoriesForSubAsync(botClient, chat, state, cancellationToken);
-                return;
-            }
-
-            using var scope = scopeFactory.CreateScope();
-            var categoryService = scope.ServiceProvider.GetRequiredService<CategoryService>();
-            await categoryService.CreateNewSubCategoryAsync(text, state.SelectedCategoryId.Value);
-
-            logger.LogInformation("Created subcategory {Name} under category {CategoryId}", text, state.SelectedCategoryId);
-            var createdFor = state.SelectedCategoryName;
-            state.SelectedCategoryId = null;
-            state.SelectedCategoryName = null;
-            state.Step = SettingsExpensesStep;
-            await ShowExpensesSettingsAsync(botClient, chat, state, $"✅ Sottocategoria *{text}* creata in *{createdFor}*", cancellationToken);
-        }
-    }
-
-    public override bool CanHandleBack(ConversationState state) =>
-        state.Step is SettingsExpensesStep or AddCategoryStep or SelectCategoryForSubStep or AddSubCategoryStep;
+    public override bool CanHandleBack(ConversationState state) => state.Step == SettingsRootStep;
 
     public override async Task<bool> HandleBackAsync(
         ITelegramBotClient botClient,
@@ -168,29 +72,9 @@ public class SettingsFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Sett
         ConversationState state,
         CancellationToken cancellationToken)
     {
-        logger.LogInformation("Settings back from step {Step}", state.Step);
-
-        switch (state.Step)
-        {
-            case SettingsExpensesStep:
-                state.Step = SettingsRootStep;
-                await ShowSettingsRootAsync(botClient, chat, state, cancellationToken);
-                return true;
-            case AddCategoryStep:
-                state.Step = SettingsExpensesStep;
-                await ShowExpensesSettingsAsync(botClient, chat, state, "⚙️ *Impostazioni spese*", cancellationToken);
-                return true;
-            case SelectCategoryForSubStep:
-                state.Step = SettingsExpensesStep;
-                await ShowExpensesSettingsAsync(botClient, chat, state, "⚙️ *Impostazioni spese*", cancellationToken);
-                return true;
-            case AddSubCategoryStep:
-                state.Step = SelectCategoryForSubStep;
-                await ShowCategoriesForSubAsync(botClient, chat, state, cancellationToken);
-                return true;
-            default:
-                return false;
-        }
+        state.Step = SettingsRootStep;
+        await ShowSettingsRootAsync(botClient, chat, state, cancellationToken);
+        return true;
     }
 
     private async Task ShowSettingsRootAsync(
@@ -199,114 +83,20 @@ public class SettingsFlowHandler(IServiceScopeFactory scopeFactory, ILogger<Sett
         ConversationState state,
         CancellationToken cancellationToken)
     {
-        var keyboard = new InlineKeyboardMarkup([
-            [Utils.Utils.ButtonWithCallbackdata("⚙️ Impostazioni spese", CallbackSettingsExpenses, "expenses")],
-            [Utils.Utils.MainMenu]
-        ]);
+        var buttons = SubFlows
+            .Select(flow => new[]
+            {
+                Utils.Utils.ButtonWithCallbackdata(flow.SettingsMenuText, flow.SettingsCallbackName, flow.SettingsCallbackData)
+            })
+            .ToList();
+
+        buttons.Add([Utils.Utils.MainMenu]);
+        var keyboard =  new InlineKeyboardMarkup(buttons);
 
         var msg = await botClient.TryEditMessageText(
             chat.Id,
             state.LastBotMessageId,
             "⚙️ *Impostazioni*\nSeleziona una sezione:",
-            ParseMode.Markdown,
-            keyboard,
-            cancellationToken);
-
-        state.LastBotMessageId = msg.MessageId;
-    }
-
-    private async Task ShowExpensesSettingsAsync(
-        ITelegramBotClient botClient,
-        Chat chat,
-        ConversationState state,
-        string header,
-        CancellationToken cancellationToken)
-    {
-        var keyboard = new InlineKeyboardMarkup([
-            [Utils.Utils.ButtonWithCallbackdata("➕ Categoria", CallbackAddCategory, "start")],
-            [Utils.Utils.ButtonWithCallbackdata("➕ Sottocategoria", CallbackAddSubCategory, "start")],
-            [Utils.Utils.Back],
-            [Utils.Utils.MainMenu]
-        ]);
-
-        var msg = await botClient.TryEditMessageText(
-            chat.Id,
-            state.LastBotMessageId,
-            header,
-            ParseMode.Markdown,
-            keyboard,
-            cancellationToken);
-
-        state.LastBotMessageId = msg.MessageId;
-    }
-
-    private async Task AskForCategoryNameAsync(
-        ITelegramBotClient botClient,
-        Chat chat,
-        ConversationState state,
-        CancellationToken cancellationToken)
-    {
-        var keyboard = new InlineKeyboardMarkup([
-            [Utils.Utils.Back],
-            [Utils.Utils.MainMenu]
-        ]);
-
-        var msg = await botClient.TryEditMessageText(
-            chat.Id,
-            state.LastBotMessageId,
-            "✏️ Inserisci il nome della nuova categoria:",
-            ParseMode.Markdown,
-            keyboard,
-            cancellationToken);
-
-        state.LastBotMessageId = msg.MessageId;
-    }
-
-    private async Task ShowCategoriesForSubAsync(
-        ITelegramBotClient botClient,
-        Chat chat,
-        ConversationState state,
-        CancellationToken cancellationToken)
-    {
-        using var scope = scopeFactory.CreateScope();
-        var categoryService = scope.ServiceProvider.GetRequiredService<CategoryService>();
-        var categories = await categoryService.GetAllCategoriesAsync();
-
-        var buttons = categories
-            .Select(c => new[] { Utils.Utils.ButtonWithCallbackdata(c.Name, CallbackPickCategory, c.Id) })
-            .ToList();
-
-        buttons.Add([Utils.Utils.Back]);
-        buttons.Add([Utils.Utils.MainMenu]);
-
-        var keyboard = new InlineKeyboardMarkup(buttons);
-
-        var msg = await botClient.TryEditMessageText(
-            chat.Id,
-            state.LastBotMessageId,
-            "📁 Seleziona la categoria per la nuova sottocategoria:",
-            ParseMode.Markdown,
-            keyboard,
-            cancellationToken);
-
-        state.LastBotMessageId = msg.MessageId;
-    }
-
-    private async Task AskForSubCategoryNameAsync(
-        ITelegramBotClient botClient,
-        Chat chat,
-        ConversationState state,
-        CancellationToken cancellationToken)
-    {
-        var keyboard = new InlineKeyboardMarkup([
-            [Utils.Utils.Back],
-            [Utils.Utils.MainMenu]
-        ]);
-
-        var msg = await botClient.TryEditMessageText(
-            chat.Id,
-            state.LastBotMessageId,
-            $"✏️ Inserisci il nome della nuova sottocategoria per *{state.SelectedCategoryName}*:",
             ParseMode.Markdown,
             keyboard,
             cancellationToken);
