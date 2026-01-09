@@ -140,8 +140,17 @@
     <script>
         // Initialize Telegram WebApp
         const tg = window.Telegram.WebApp;
+
+        // Check if WebApp is available
+        if (!tg) {
+            console.error('Telegram WebApp not available');
+            document.body.innerHTML = '<div style="padding: 20px; text-align: center;">❌ Errore: WebApp non disponibile</div>';
+        }
+
         tg.expand();
         tg.enableClosingConfirmation();
+
+        console.log('Telegram WebApp initialized', tg);
 
         // Set default to today
         const dateInput = document.getElementById('datePicker');
@@ -182,6 +191,8 @@
             const selectedDate = dateInput.value;
             const errorMessage = document.getElementById('errorMessage');
 
+            console.log('sendDate called with:', selectedDate);
+
             if (!selectedDate) {
                 errorMessage.classList.add('show');
                 setTimeout(() => errorMessage.classList.remove('show'), 3000);
@@ -200,9 +211,19 @@
                 return;
             }
 
-            // Send data back to bot in ISO format
-            tg.sendData(selectedDate);
-            tg.close();
+            try {
+                console.log('Sending data to Telegram:', selectedDate);
+                // IMPORTANT: Disable closing confirmation before sending data
+                tg.disableClosingConfirmation();
+                // Send data back to bot in ISO format
+                tg.sendData(selectedDate);
+                console.log('Data sent successfully');
+                // Note: tg.sendData() automatically closes the WebApp, no need to call tg.close()
+            } catch (error) {
+                console.error('Error sending data:', error);
+                errorMessage.textContent = 'Errore nell\'invio: ' + error.message;
+                errorMessage.classList.add('show');
+            }
         }
 
         function close() {
