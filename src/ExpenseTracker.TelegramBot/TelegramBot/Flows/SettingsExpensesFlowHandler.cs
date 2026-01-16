@@ -246,7 +246,12 @@ public class ExpensesFlowHandler(
                 // Go back to settings root
                 var settingsFlowData = new SettingsFlowData();
                 state.SetFlowData(settingsFlowData);
-                return false; // Let controller handle showing settings root
+
+                var settingsHandler = serviceProvider.GetServices<FlowHandler>()
+                    .OfType<SettingsFlowHandler>()
+                    .First();
+                await settingsHandler.ShowSettingsRootAsync(botClient, chat, state, cancellationToken);
+                return true;
 
             case SettingsExpensesFlowData.StepAddCategory:
             case SettingsExpensesFlowData.StepSelectCategoryForSub:
