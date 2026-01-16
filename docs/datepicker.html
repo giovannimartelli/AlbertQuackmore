@@ -1,11 +1,28 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Seleziona Data</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Flatpickr Dependencies -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/it.js"></script>
+
     <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-hint-color: #999999;
+            --tg-theme-link-color: #2481cc;
+            --tg-theme-button-color: #3390ec;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #f0f0f0;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,8 +31,8 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
             padding: 20px;
             display: flex;
             flex-direction: column;
@@ -27,41 +44,88 @@
         .container {
             width: 100%;
             max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
         }
 
         h1 {
             font-size: 24px;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             text-align: center;
-            color: var(--tg-theme-text-color, #000000);
+            color: var(--tg-theme-text-color);
         }
 
-        .date-input-wrapper {
-            position: relative;
-            width: 100%;
-            margin-bottom: 20px;
+        /* Flatpickr Customization for Telegram Theme */
+        .flatpickr-calendar {
+            background: var(--tg-theme-bg-color) !important;
+            box-shadow: none !important;
+            border: 1px solid var(--tg-theme-secondary-bg-color) !important;
+            margin: 0 auto !important;
         }
 
-        input[type="date"] {
-            width: 100%;
-            padding: 16px;
-            font-size: 18px;
-            border: 2px solid var(--tg-theme-button-color, #3390ec);
-            border-radius: 12px;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
-            outline: none;
-            transition: border-color 0.2s;
+        .flatpickr-day {
+            color: var(--tg-theme-text-color) !important;
         }
 
-        input[type="date"]:focus {
-            border-color: var(--tg-theme-button-text-color, #ffffff);
+        .flatpickr-day.selected,
+        .flatpickr-day.startRange,
+        .flatpickr-day.endRange,
+        .flatpickr-day.selected.inRange,
+        .flatpickr-day.startRange.inRange,
+        .flatpickr-day.endRange.inRange,
+        .flatpickr-day.today.selected,
+        .flatpickr-day.today.inRange,
+        .flatpickr-day.prevMonthDay.selected,
+        .flatpickr-day.nextMonthDay.selected {
+            background: var(--tg-theme-button-color) !important;
+            border-color: var(--tg-theme-button-color) !important;
+            color: var(--tg-theme-button-text-color) !important;
+        }
+
+        .flatpickr-day.today {
+            border-color: var(--tg-theme-button-color) !important;
+        }
+
+        .flatpickr-day:hover,
+        .flatpickr-day.prevMonthDay:hover,
+        .flatpickr-day.nextMonthDay:hover,
+        .flatpickr-day:focus,
+        .flatpickr-day.prevMonthDay:focus,
+        .flatpickr-day.nextMonthDay:focus {
+            background: var(--tg-theme-secondary-bg-color) !important;
+            border-color: var(--tg-theme-secondary-bg-color) !important;
+        }
+
+        .flatpickr-months .flatpickr-month {
+            color: var(--tg-theme-text-color) !important;
+            fill: var(--tg-theme-text-color) !important;
+        }
+
+        .flatpickr-current-month .flatpickr-monthDropdown-months {
+            color: var(--tg-theme-text-color) !important;
+        }
+
+        .flatpickr-weekdays {
+            color: var(--tg-theme-hint-color) !important;
+        }
+
+        span.flatpickr-weekday {
+            color: var(--tg-theme-hint-color) !important;
+        }
+
+        .flatpickr-months .flatpickr-prev-month,
+        .flatpickr-months .flatpickr-next-month {
+            fill: var(--tg-theme-text-color) !important;
+            color: var(--tg-theme-text-color) !important;
         }
 
         .button-group {
             display: flex;
             gap: 10px;
             flex-direction: column;
+            width: 100%;
         }
 
         button {
@@ -73,8 +137,8 @@
             border-radius: 12px;
             cursor: pointer;
             transition: opacity 0.2s;
-            color: var(--tg-theme-button-text-color, #ffffff);
-            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color);
+            background-color: var(--tg-theme-button-color);
         }
 
         button:active {
@@ -82,22 +146,8 @@
         }
 
         button.secondary {
-            background-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
-            color: var(--tg-theme-text-color, #000000);
-        }
-
-        .quick-buttons {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
-        .quick-button {
-            padding: 12px;
-            font-size: 14px;
-            background-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
-            color: var(--tg-theme-text-color, #000000);
+            background-color: var(--tg-theme-secondary-bg-color);
+            color: var(--tg-theme-text-color);
         }
 
         .error-message {
@@ -105,6 +155,7 @@
             text-align: center;
             margin-top: 10px;
             display: none;
+            font-size: 14px;
         }
 
         .error-message.show {
@@ -112,24 +163,17 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>📅 Seleziona Data</h1>
 
-        <div class="quick-buttons">
-            <button class="quick-button" onclick="setToday()">Oggi</button>
-            <button class="quick-button" onclick="setYesterday()">Ieri</button>
-            <button class="quick-button" onclick="setLastWeek()">7 giorni fa</button>
-            <button class="quick-button" onclick="setLastMonth()">30 giorni fa</button>
-        </div>
-
-        <div class="date-input-wrapper">
-            <input type="date" id="datePicker" />
-        </div>
+        <div id="calendar-container"></div>
+        <input type="hidden" id="datePicker">
 
         <div class="button-group">
             <button onclick="sendDate()">✅ Conferma</button>
-            <button class="secondary" onclick="close()">❌ Annulla</button>
+            <button class="secondary" onclick="closeApp()">❌ Annulla</button>
         </div>
 
         <div class="error-message" id="errorMessage">
@@ -145,18 +189,14 @@
         if (!tg) {
             console.error('Telegram WebApp not available');
             document.body.innerHTML = '<div style="padding: 20px; text-align: center;">❌ Errore: WebApp non disponibile</div>';
+        } else {
+            tg.expand();
+            tg.enableClosingConfirmation();
+            console.log('Telegram WebApp initialized', tg);
         }
 
-        tg.expand();
-        tg.enableClosingConfirmation();
-
-        console.log('Telegram WebApp initialized', tg);
-        console.log('WebApp version:', tg.version);
-        console.log('WebApp initDataUnsafe:', tg.initDataUnsafe);
-        console.log('sendData available:', typeof tg.sendData === 'function');
-
         // Show warning if WebApp wasn't opened properly
-        if (!tg.initDataUnsafe?.user) {
+        if (tg && !tg.initDataUnsafe?.user) {
             console.warn('WebApp not opened from Telegram bot - initDataUnsafe.user is missing');
             const warning = document.createElement('div');
             warning.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; background: #ff3b30; color: white; padding: 10px; text-align: center; z-index: 9999; font-size: 12px;';
@@ -164,40 +204,25 @@
             document.body.insertBefore(warning, document.body.firstChild);
         }
 
-        // Set default to today
-        const dateInput = document.getElementById('datePicker');
+        // Initialize Flatpickr
         const today = new Date();
-        dateInput.value = formatDate(today);
-        dateInput.max = formatDate(today); // Prevent future dates
+        const dateInput = document.getElementById('datePicker');
 
-        function formatDate(date) {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
+        const fp = flatpickr("#calendar-container", {
+            locale: "it",
+            inline: true,
+            defaultDate: today,
+            maxDate: today,
+            dateFormat: "Y-m-d",
+            disableMobile: "true", // Force custom calendar on mobile too
+            onChange: function (selectedDates, dateStr, instance) {
+                dateInput.value = dateStr;
+                console.log("Date selected:", dateStr);
+            }
+        });
 
-        function setToday() {
-            dateInput.value = formatDate(new Date());
-        }
-
-        function setYesterday() {
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
-            dateInput.value = formatDate(yesterday);
-        }
-
-        function setLastWeek() {
-            const lastWeek = new Date();
-            lastWeek.setDate(lastWeek.getDate() - 7);
-            dateInput.value = formatDate(lastWeek);
-        }
-
-        function setLastMonth() {
-            const lastMonth = new Date();
-            lastMonth.setDate(lastMonth.getDate() - 30);
-            dateInput.value = formatDate(lastMonth);
-        }
+        // Set initial value
+        dateInput.value = fp.formatDate(today, "Y-m-d");
 
         function sendDate() {
             const selectedDate = dateInput.value;
@@ -225,17 +250,14 @@
             }
 
             // Check if sendData is available
-            if (typeof tg.sendData !== 'function') {
+            if (!tg || typeof tg.sendData !== 'function') {
                 console.error('tg.sendData is not available');
-                errorMessage.textContent = '❌ WebApp non aperto correttamente. Usa il bottone dal bot.';
+                errorMessage.textContent = '❌ WebApp non aperto correttamente.';
                 errorMessage.classList.add('show');
                 return;
             }
 
             try {
-                console.log('About to send data to Telegram:', selectedDate);
-                console.log('Telegram WebApp object:', tg);
-
                 // IMPORTANT: Disable closing confirmation before sending data
                 tg.disableClosingConfirmation();
 
@@ -248,15 +270,7 @@
                 // Send data back to bot in ISO format
                 console.log('Calling tg.sendData()...');
                 tg.sendData(selectedDate);
-                console.log('tg.sendData() called - waiting for WebApp to close');
-
-                // If we reach here and WebApp doesn't close, there's a problem
-                setTimeout(() => {
-                    console.error('WebApp did not close after sendData');
-                    errorMessage.textContent = '❌ Errore: il WebApp non si è chiuso. Controlla la configurazione del dominio su BotFather.';
-                    errorMessage.style.color = '#ff3b30';
-                    document.body.style.opacity = '1';
-                }, 2000);
+                console.log('tg.sendData() called');
 
             } catch (error) {
                 console.error('Error sending data:', error);
@@ -267,14 +281,17 @@
             }
         }
 
-        function close() {
-            tg.close();
+        function closeApp() {
+            if (tg) tg.close();
         }
 
-        // Listen for theme changes
-        tg.onEvent('themeChanged', function() {
-            console.log('Theme changed');
-        });
+        // Listen for theme changes to re-render if needed (though CSS variables handles most)
+        if (tg) {
+            tg.onEvent('themeChanged', function () {
+                console.log('Theme changed');
+            });
+        }
     </script>
 </body>
+
 </html>
