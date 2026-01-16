@@ -10,6 +10,8 @@ public class ConversationState
     public int? SelectedTagId { get; set; }
     public string? SelectedTagName { get; set; }
     public string? Description { get; set; }
+    public decimal? Amount { get; set; }
+    public DateOnly? SelectedDate { get; set; }
     public int? LastBotMessageId { get; set; }
     
     /// <summary>
@@ -36,6 +38,8 @@ public class ConversationState
         SelectedTagId = null;
         SelectedTagName = null;
         Description = null;
+        Amount = null;
+        SelectedDate = null;
         LastBotMessageId = null;
         CreatedSubCategoryId = null;
         CreatedSubCategoryName = null;

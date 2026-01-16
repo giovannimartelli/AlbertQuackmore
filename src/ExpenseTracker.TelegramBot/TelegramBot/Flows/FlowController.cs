@@ -224,4 +224,33 @@ public class FlowController
         // No handler could handle the back action, return to main menu
         await ShowMainMenuAsync(botClient, chat, state, false, cancellationToken);
     }
+
+    /// <summary>
+    /// Handles data received from a Telegram WebApp.
+    /// </summary>
+    public async Task HandleWebAppDataAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
+        var chat = message.Chat;
+
+        // Find a handler that can handle WebApp data in the current state
+        var handler = _handlers.FirstOrDefault(h => h.CanHandleWebAppData(state));
+        if (handler != null)
+        {
+            _logger.LogInformation("WebApp data handled by {HandlerType} in step {Step}", handler.GetType().Name, state.Step);
+            await handler.HandleWebAppDataAsync(botClient, message, state, cancellationToken);
+            return;
+        }
+
+        // No handler found
+        _logger.LogWarning("No handler found for WebApp data in step {Step}", state.Step);
+        await botClient.SendFlowMessageAsync(
+            chatId: chat.Id,
+            state,
+            text: "❓ Unexpected data received.",
+            cancellationToken: cancellationToken);
+    }
 }

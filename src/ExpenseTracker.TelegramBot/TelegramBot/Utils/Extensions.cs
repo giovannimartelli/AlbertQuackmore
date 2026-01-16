@@ -9,41 +9,6 @@ namespace ExpenseTracker.TelegramBot.TelegramBot.Utils;
 public static class Extensions
 {
     /// <summary>
-    /// Tries to edit an existing message, falls back to sending a new message if editing fails.
-    /// </summary>
-    public static async Task<Message> TryEditMessageText(this ITelegramBotClient botClient,
-        ChatId chatId,
-        int? messageId,
-        string text,
-        ParseMode parseMode = default,
-        InlineKeyboardMarkup? replyMarkup = default,
-        CancellationToken cancellationToken = default
-    )
-    {
-        if (messageId != null)
-            try
-            {
-                return await botClient.EditMessageText(
-                    chatId: chatId,
-                    messageId: messageId.Value,
-                    text: text,
-                    parseMode: ParseMode.Markdown,
-                    replyMarkup: replyMarkup,
-                    cancellationToken: cancellationToken);
-            }
-            catch (ApiRequestException)
-            {
-            }
-
-        return await botClient.SendMessage(
-            chatId: chatId,
-            text: text,
-            parseMode: ParseMode.Markdown,
-            replyMarkup: replyMarkup,
-            cancellationToken: cancellationToken);
-    }
-
-    /// <summary>
     /// Sends a new message for a sub-flow and tracks it for later deletion.
     /// Updates the state's LastBotMessageId and adds the message to FlowMessageIds.
     /// </summary>
@@ -53,7 +18,7 @@ public static class Extensions
         ConversationState state,
         string text,
         ParseMode parseMode = ParseMode.Markdown,
-        InlineKeyboardMarkup? replyMarkup = default,
+        IReplyMarkup? replyMarkup = default,
         CancellationToken cancellationToken = default)
     {
         var message = await botClient.SendMessage(

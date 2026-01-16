@@ -1,6 +1,7 @@
 using System.Globalization;
 using ExpenseTracker.Services;
 using ExpenseTracker.TelegramBot.TelegramBot.Utils;
+using Microsoft.Extensions.Options;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -10,10 +11,15 @@ namespace ExpenseTracker.TelegramBot.TelegramBot.Flows;
 
 /// <summary>
 /// Handles the flow for inserting a new expense.
-/// Flow: Menu → Category → Subcategory → Description → Amount → Save
+/// Flow: Menu → Category → Subcategory → Tag → Description → Amount → Date → Save
 /// </summary>
-public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger<InsertExpenseFlowHandler> logger) : FlowHandler
+public class InsertExpenseFlowHandler(
+    IServiceScopeFactory scopeFactory,
+    IOptions<WebAppOptions> webAppOptions,
+    ILogger<InsertExpenseFlowHandler> logger) : FlowHandler
 {
+    private readonly WebAppOptions _webAppOptions = webAppOptions.Value;
+
     private const string MenuCommandText = "💰 Inserisci spesa";
 
     private const string CallbackCategoryPrefix = "addexpenses_cat";
@@ -21,11 +27,18 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
     private const string CallbackTagPrefix = "addexpenses_tag";
     private const string CallbackSkipTag = "addexpenses_skiptag";
 
+    // Date selection buttons (ReplyKeyboard - text messages)
+    private const string ButtonUseTodayDate = "📅 Usa data di oggi";
+    private const string ButtonChooseDate = "📆 Scegli altra data";
+    private const string ButtonBack = "◀️ Indietro";
+    private const string ButtonMainMenu = "🏠 Menu principale";
+
     private const string SelectCategoryStep = "AddExpense_SelectCategory";
     private const string SelectSubCategoryStep = "AddExpense_SelectSubCategory";
     private const string SelectTagStep = "AddExpense_SelectTag";
     private const string AddDescriptionStep = "AddExpense_AddDescription";
     private const string InsertAmountStep = "AddExpense_InsertAmount";
+    private const string SelectDateStep = "AddExpense_SelectDate";
 
     public override string GetMenuItemInfo() => MenuCommandText;
     public override bool CanHandleMenuCommand(string command) => command == MenuCommandText;
@@ -151,7 +164,7 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
 
     public override bool CanHandleTextInput(ConversationState state)
     {
-        return state.Step is AddDescriptionStep or InsertAmountStep;
+        return state.Step is AddDescriptionStep or InsertAmountStep or SelectDateStep;
     }
 
     public override async Task HandleTextInputAsync(
@@ -175,6 +188,41 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
         {
             await HandleAmountInputAsync(botClient, chat, text, state, cancellationToken);
         }
+        else if (state.Step == SelectDateStep)
+        {
+            await HandleDateSelectionAsync(botClient, chat, text, state, cancellationToken);
+        }
+    }
+
+    private async Task HandleDateSelectionAsync(
+        ITelegramBotClient botClient,
+        Chat chat,
+        string text,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
+        if (text == ButtonUseTodayDate)
+        {
+            state.SelectedDate = DateOnly.FromDateTime(DateTime.UtcNow);
+            logger.LogInformation("Using today's date: {Date}", state.SelectedDate);
+            await SaveExpenseAsync(botClient, chat, state, cancellationToken);
+        }
+        else if (text == ButtonBack)
+        {
+            state.Amount = null;
+            state.Step = InsertAmountStep;
+            logger.LogInformation("Going back to amount input");
+            // await RemoveReplyKeyboardAsync(botClient, chat, cancellationToken);
+            await AskForAmountAsync(botClient, chat, state, cancellationToken);
+        }
+        else if (text == ButtonMainMenu)
+        {
+            // Reset state and show main menu keyboard
+            state.Reset();
+            logger.LogInformation("Returning to main menu");
+            await ShowMainMenuMessageAsync(botClient, chat, cancellationToken);
+        }
+        // Note: ButtonChooseDate opens WebApp, handled via HandleWebAppDataAsync
     }
 
     public override bool CanHandleBack(ConversationState state) =>
@@ -245,6 +293,26 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
     }
 
     // ========== PRIVATE HELPER METHODS ==========
+
+    private async Task RemoveReplyKeyboardAsync(
+        ITelegramBotClient botClient,
+        Chat chat,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var msg = await botClient.SendMessage(
+                chatId: chat.Id,
+                text: "⏳",
+                replyMarkup: new ReplyKeyboardRemove(),
+                cancellationToken: cancellationToken);
+            await botClient.DeleteMessage(chat.Id, msg.MessageId, cancellationToken);
+        }
+        catch
+        {
+            // Ignore errors
+        }
+    }
 
     private async Task ShowCategoriesAsync(
         ITelegramBotClient botClient,
@@ -405,7 +473,81 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
             return;
         }
 
-        // Save the expense
+        state.Amount = amount;
+        state.Step = SelectDateStep;
+
+        logger.LogInformation("Amount entered: {Amount}", amount);
+        await AskForDateAsync(botClient, chat, state, cancellationToken);
+    }
+
+    private async Task AskForDateAsync(
+        ITelegramBotClient botClient,
+        Chat chat,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
+        // All buttons in ReplyKeyboard
+        var replyKeyboard = new ReplyKeyboardMarkup(new[]
+        {
+            new[] { new KeyboardButton(ButtonUseTodayDate) },
+            new[] { KeyboardButton.WithWebApp(ButtonChooseDate, new WebAppInfo { Url = _webAppOptions.DatePickerUrl }) },
+            new[] { new KeyboardButton(ButtonBack), new KeyboardButton(ButtonMainMenu) }
+        })
+        {
+            ResizeKeyboard = true
+        };
+
+        var tagInfo = state.SelectedTagName != null ? $"\n🏷️ {state.SelectedTagName}" : "";
+        var text = $"📁 *{state.SelectedCategoryName}* > *{state.SelectedSubCategoryName}*{tagInfo}\n" +
+                   $"📝 {state.Description}\n" +
+                   $"💰 €{state.Amount:F2}\n\n" +
+                   "📆 *Seleziona la data della spesa:*";
+
+        var msg = await botClient.SendMessage(
+            chatId: chat.Id,
+            text: text,
+            parseMode: ParseMode.Markdown,
+            replyMarkup: replyKeyboard,
+            cancellationToken: cancellationToken);
+
+        state.TrackFlowMessage(msg.MessageId);
+        state.LastBotMessageId = msg.MessageId;
+    }
+
+    public override bool CanHandleWebAppData(ConversationState state) =>
+        state.Step == SelectDateStep;
+
+    public override async Task HandleWebAppDataAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
+        var chat = message.Chat;
+        var dateString = message.WebAppData!.Data;
+
+        if (!DateOnly.TryParse(dateString, out var selectedDate))
+        {
+            logger.LogWarning("Invalid date received from WebApp: {DateString}", dateString);
+            await botClient.SendFlowMessageAsync(
+                chatId: chat.Id,
+                state,
+                text: "❌ Data non valida ricevuta. Riprova.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        state.SelectedDate = selectedDate;
+        logger.LogInformation("Date selected from WebApp: {Date}", selectedDate);
+        await SaveExpenseAsync(botClient, chat, state, cancellationToken);
+    }
+
+    private async Task SaveExpenseAsync(
+        ITelegramBotClient botClient,
+        Chat chat,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
         try
         {
             using var scope = scopeFactory.CreateScope();
@@ -413,40 +555,81 @@ public class InsertExpenseFlowHandler(IServiceScopeFactory scopeFactory, ILogger
 
             await expenseService.CreateExpenseAsync(
                 subCategoryId: state.SelectedSubCategoryId!.Value,
-                amount: amount,
+                amount: state.Amount!.Value,
                 description: state.Description ?? throw new InvalidOperationException("Description cannot be null"),
                 notes: null,
                 performedBy: chat.Username ?? chat.Id.ToString(),
                 tagId: state.SelectedTagId,
-                DateOnly.FromDateTime(DateTime.UtcNow));
+                state.SelectedDate!.Value);
 
-            logger.LogInformation("Expense created: {Amount} - {Description} - Tag: {TagId}", amount, state.Description, state.SelectedTagId);
+            logger.LogInformation("Expense created: {Amount} - {Description} - Tag: {TagId} - Date: {Date}",
+                state.Amount, state.Description, state.SelectedTagId, state.SelectedDate);
 
-            // Build confirmation message
+            // Build confirmation message with main menu keyboard
             var tagInfo = state.SelectedTagName != null ? $"\n🏷️ {state.SelectedTagName}" : "";
-            var confirmationText = $"✅ *Expense successfully recorded!*\n\n" +
+            var confirmationText = $"✅ *Spesa registrata!*\n\n" +
                                    $"📁 {state.SelectedCategoryName} > {state.SelectedSubCategoryName}{tagInfo}\n" +
                                    $"📝 {state.Description}\n" +
-                                   $"💰 €{amount:F2}";
+                                   $"💰 €{state.Amount:F2}\n" +
+                                   $"📆 {state.SelectedDate:dd/MM/yyyy}";
 
-            // Update message with confirmation
-            await botClient.EditMessageText(
+            // Send confirmation with main menu keyboard
+            await botClient.SendFlowMessageAsync(
                 chatId: chat.Id,
-                messageId: state.LastBotMessageId!.Value,
+                state,
                 text: confirmationText,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: new InlineKeyboardMarkup([
-                    [Utils.Utils.MainMenu]
-                ]),
                 cancellationToken: cancellationToken);
+            await ShowMainMenuMessageAsFlowMessageAsync(botClient, state, chat, cancellationToken);
+            // Reset state
+            state.Reset();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error creating expense");
             await botClient.SendMessage(
                 chatId: chat.Id,
-                text: "❌ An error occurred while saving the expense. Please try again.",
+                text: "❌ Si è verificato un errore durante il salvataggio. Riprova.",
+                replyMarkup: GetMainMenuKeyboard(),
                 cancellationToken: cancellationToken);
         }
+    }
+
+    private async Task ShowMainMenuMessageAsync(
+        ITelegramBotClient botClient,
+        Chat chat,
+        CancellationToken cancellationToken)
+    {
+        await botClient.SendMessage(
+            chatId: chat.Id,
+            text: "👋 *Menu principale*\n\nScegli un'operazione:",
+            parseMode: ParseMode.Markdown,
+            replyMarkup: GetMainMenuKeyboard(),
+            cancellationToken: cancellationToken);
+    }
+    private async Task ShowMainMenuMessageAsFlowMessageAsync(
+        ITelegramBotClient botClient,
+        ConversationState state,
+        Chat chat,
+        CancellationToken cancellationToken)
+    {
+        await botClient.SendFlowMessageAsync(
+            chatId: chat.Id,
+            state,
+            text: "👋 *Menu principale*\n\nScegli un'operazione:",
+            parseMode: ParseMode.Markdown,
+            replyMarkup: GetMainMenuKeyboard(),
+            cancellationToken: cancellationToken);
+    }
+
+    private static ReplyKeyboardMarkup GetMainMenuKeyboard()
+    {
+        return new ReplyKeyboardMarkup(new[]
+        {
+            new[] { new KeyboardButton(MenuCommandText) },
+            new[] { new KeyboardButton("⚙️ Settings") }
+        })
+        {
+            ResizeKeyboard = true
+        };
     }
 }

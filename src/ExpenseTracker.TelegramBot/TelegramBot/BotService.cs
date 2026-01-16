@@ -53,6 +53,10 @@ public class BotService(
             {
                 await HandleCallbackQueryAsync(client, callbackQuery, cancellationToken);
             }
+            else if (update.Message is { WebAppData: not null } webAppMessage)
+            {
+                await HandleWebAppDataAsync(client, webAppMessage, cancellationToken);
+            }
             else if (update.Message is { Text: not null } message)
             {
                 await HandleTextMessageAsync(client, message, cancellationToken);
@@ -119,9 +123,34 @@ public class BotService(
         await flowController.HandleCallbackQueryAsync(client, callbackQuery, state, cancellationToken);
     }
 
+    private async Task HandleWebAppDataAsync(
+        ITelegramBotClient client,
+        Message message,
+        CancellationToken cancellationToken)
+    {
+        var chat = message.Chat;
+        var chatUsername = chat.Username;
+
+        if (chatUsername is null || !IsAuthorized(chatUsername))
+        {
+            logger.LogWarning("Unauthorized WebApp data from chat {ChatId}", chatUsername ?? "unknown");
+            return;
+        }
+
+        var webAppData = message.WebAppData!;
+        logger.LogInformation("Received WebApp data from {ChatId}: {Data}", chatUsername, webAppData.Data);
+
+        var state = GetOrCreateState(chatUsername);
+
+        await flowController.HandleWebAppDataAsync(client, message, state, cancellationToken);
+
+        // Delete user message after processing
+        await TryDeleteMessageAsync(client, chat.Id, message.MessageId, cancellationToken);
+    }
+
     private bool IsAuthorized(string chatUsername)
     {
-        return _options.AllowedUsername.Length == 0 || _options.AllowedUsername.Contains(chatUsername);
+        return _options.AllowedUsername.Length != 0 && _options.AllowedUsername.Contains(chatUsername);
     }
 
     private async Task TryDeleteMessageAsync(ITelegramBotClient client, long chatId, int messageId, CancellationToken cancellationToken)

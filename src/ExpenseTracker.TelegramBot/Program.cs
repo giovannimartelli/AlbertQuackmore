@@ -15,6 +15,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.Configure<TelegramOptions>(
     builder.Configuration.GetSection(TelegramOptions.SectionName));
 
+builder.Services.Configure<WebAppOptions>(
+    builder.Configuration.GetSection(WebAppOptions.SectionName));
+
 builder.Services.AddSingleton<ITelegramBotClient>(_ =>
 {
     var config = builder.Configuration.GetSection(TelegramOptions.SectionName).Get<TelegramOptions>();

@@ -86,4 +86,20 @@ public abstract class FlowHandler
         Chat chat,
         ConversationState state,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Determines if this handler can handle WebApp data based on the current state.
+    /// </summary>
+    /// <param name="state">The current conversation state</param>
+    /// <returns>True if this handler can handle WebApp data in this state</returns>
+    public virtual bool CanHandleWebAppData(ConversationState state) => false;
+
+    /// <summary>
+    /// Handles data received from a Telegram WebApp (e.g., date picker).
+    /// </summary>
+    public virtual Task HandleWebAppDataAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ConversationState state,
+        CancellationToken cancellationToken) => Task.CompletedTask;
 }
