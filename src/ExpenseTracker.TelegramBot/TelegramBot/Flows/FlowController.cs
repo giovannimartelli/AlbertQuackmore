@@ -253,4 +253,33 @@ public class FlowController
             text: "❓ Unexpected data received.",
             cancellationToken: cancellationToken);
     }
+
+    /// <summary>
+    /// Handles a document (file) sent by the user.
+    /// </summary>
+    public async Task HandleDocumentAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ConversationState state,
+        CancellationToken cancellationToken)
+    {
+        var chat = message.Chat;
+
+        // Find a handler that can handle document in the current state
+        var handler = _handlers.FirstOrDefault(h => h.CanHandleDocument(state));
+        if (handler != null)
+        {
+            _logger.LogInformation("Document handled by {HandlerType} in step {Step}", handler.GetType().Name, state.CurrentStep);
+            await handler.HandleDocumentAsync(botClient, message, state, cancellationToken);
+            return;
+        }
+
+        // No handler found
+        _logger.LogWarning("No handler found for document in step {Step}", state.CurrentStep);
+        await botClient.SendFlowMessageAsync(
+            chatId: chat.Id,
+            state,
+            text: "❓ Non ero in attesa di un file. Usa il menu per iniziare l'importazione.",
+            cancellationToken: cancellationToken);
+    }
 }

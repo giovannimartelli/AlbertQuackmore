@@ -102,4 +102,20 @@ public abstract class FlowHandler
         Message message,
         ConversationState state,
         CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// Determines if this handler can handle a document based on the current state.
+    /// </summary>
+    /// <param name="state">The current conversation state</param>
+    /// <returns>True if this handler can handle a document in this state</returns>
+    public virtual bool CanHandleDocument(ConversationState state) => false;
+
+    /// <summary>
+    /// Handles a document (file) sent by the user.
+    /// </summary>
+    public virtual Task HandleDocumentAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ConversationState state,
+        CancellationToken cancellationToken) => Task.CompletedTask;
 }

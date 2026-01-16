@@ -57,6 +57,10 @@ public class BotService(
             {
                 await HandleWebAppDataAsync(client, webAppMessage, cancellationToken);
             }
+            else if (update.Message is { Document: not null } documentMessage)
+            {
+                await HandleDocumentAsync(client, documentMessage, cancellationToken);
+            }
             else if (update.Message is { Text: not null } message)
             {
                 await HandleTextMessageAsync(client, message, cancellationToken);
@@ -146,6 +150,31 @@ public class BotService(
 
         // Delete user message after processing
         await TryDeleteMessageAsync(client, chat.Id, message.MessageId, cancellationToken);
+    }
+
+    private async Task HandleDocumentAsync(
+        ITelegramBotClient client,
+        Message message,
+        CancellationToken cancellationToken)
+    {
+        var chat = message.Chat;
+        var chatUsername = chat.Username;
+
+        if (chatUsername is null || !IsAuthorized(chatUsername))
+        {
+            logger.LogWarning("Unauthorized document from chat {ChatId}", chatUsername ?? "unknown");
+            await client.SendMessage(
+                chatId: chat.Id,
+                text: "Non sei autorizzato ad usare questo bot.",
+                cancellationToken: cancellationToken);
+            return;
+        }
+
+        logger.LogInformation("Received document from {ChatId}: {FileName}", chatUsername, message.Document?.FileName);
+
+        var state = GetOrCreateState(chatUsername);
+
+        await flowController.HandleDocumentAsync(client, message, state, cancellationToken);
     }
 
     private bool IsAuthorized(string chatUsername)

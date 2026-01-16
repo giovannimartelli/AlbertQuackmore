@@ -26,6 +26,7 @@ builder.Services.AddSingleton<ITelegramBotClient>(_ =>
 
 builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<ExpenseService>();
+builder.Services.AddScoped<ImportService>();
 
 // Auto-discover and register all FlowHandler implementations as Singleton
 // FlowHandlers are stateless (state is passed as parameter) and use IServiceScopeFactory for scoped dependencies
