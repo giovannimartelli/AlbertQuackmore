@@ -18,8 +18,8 @@ services:
       retries: 5
 
   bot:
-    image: giovannimartelli/AlbertQuackmore
-    container_name: albertquackmore-bot
+    image: giovannimartelli/albert_quackmore
+    container_name: albert_quackmore-bot
     depends_on:
       postgres:
         condition: service_healthy
