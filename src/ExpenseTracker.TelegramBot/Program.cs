@@ -18,6 +18,9 @@ builder.Services.Configure<TelegramOptions>(
 builder.Services.Configure<WebAppOptions>(
     builder.Configuration.GetSection(WebAppOptions.SectionName));
 
+builder.Services.Configure<FlowOptions>(
+    builder.Configuration.GetSection(FlowOptions.SectionName));
+
 builder.Services.AddSingleton<ITelegramBotClient>(_ =>
 {
     var config = builder.Configuration.GetSection(TelegramOptions.SectionName).Get<TelegramOptions>();
@@ -28,11 +31,29 @@ builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<ExpenseService>();
 builder.Services.AddScoped<ImportService>();
 
-// Auto-discover and register all FlowHandler implementations as Singleton
+// Auto-discover and register enabled FlowHandler implementations as Singleton
 // FlowHandlers are stateless (state is passed as parameter) and use IServiceScopeFactory for scoped dependencies
+var flowOptions = builder.Configuration.GetSection(FlowOptions.SectionName).Get<FlowOptions>();
+var enabledFlows = flowOptions?.EnabledFlows ?? [];
+
+if (enabledFlows.Length == 0)
+    throw new ArgumentException("Missing Flows configuration. Configure Flows.EnabledFlows");
+
 var flowHandlerTypes = Assembly.GetExecutingAssembly()
     .GetTypes()
-    .Where(t => t.IsClass && !t.IsAbstract && t.IsSubclassOf(typeof(FlowHandler)));
+    .Where(t => t.IsClass && !t.IsAbstract && t.IsSubclassOf(typeof(FlowHandler)))
+    .Where(t =>
+    {
+        // Get the Flow attribute
+        var flowAttribute = t.GetCustomAttribute<FlowAttribute>();
+        if (flowAttribute == null)
+        {
+            throw new InvalidOperationException(
+                $"FlowHandler '{t.Name}' must be decorated with [Flow(\"FlowName\")] attribute");
+        }
+
+        return enabledFlows.Contains(flowAttribute.Name, StringComparer.OrdinalIgnoreCase);
+    });
 
 foreach (var handlerType in flowHandlerTypes)
 {

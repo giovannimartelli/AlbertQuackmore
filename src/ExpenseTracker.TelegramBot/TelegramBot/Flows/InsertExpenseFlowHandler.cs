@@ -13,6 +13,7 @@ namespace ExpenseTracker.TelegramBot.TelegramBot.Flows;
 /// Handles the flow for inserting a new expense.
 /// Flow: Menu → Category → Subcategory → Tag → Description → Amount → Date → Save
 /// </summary>
+[Flow("InsertExpense")]
 public class InsertExpenseFlowHandler(
     IServiceScopeFactory scopeFactory,
     IOptions<WebAppOptions> webAppOptions,

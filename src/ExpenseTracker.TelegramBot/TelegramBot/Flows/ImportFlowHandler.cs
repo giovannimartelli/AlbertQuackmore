@@ -17,6 +17,7 @@ public class ImportFlowData : IFlowData
     public int? Year { get; set; }
 }
 
+[Flow("ImportBudgets")]
 public class ImportFlowHandler(
     IServiceScopeFactory scopeFactory,
     IServiceProvider serviceProvider,

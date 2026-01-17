@@ -10,6 +10,7 @@ namespace ExpenseTracker.TelegramBot.TelegramBot.Flows;
 /// Settings flow that acts as a menu and hosts settings subflows.
 /// Currently supports expense settings: add category and add subcategory.
 /// </summary>
+[Flow("Settings")]
 public class SettingsFlowHandler(IServiceProvider serviceProvider, ILogger<SettingsFlowHandler> logger) : FlowHandler
 {
     private const string MenuCommandText = "⚙️ Settings";

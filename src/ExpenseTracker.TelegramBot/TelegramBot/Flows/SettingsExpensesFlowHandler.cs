@@ -14,6 +14,7 @@ namespace ExpenseTracker.TelegramBot.TelegramBot.Flows;
 /// Entry from SettingsRoot via callback settings_expenses/expenses.
 /// Flow: select action -> (add category -> text) OR (add subcategory -> pick cat -> text)
 /// </summary>
+[Flow("SettingsExpenses")]
 public class ExpensesFlowHandler(
     IServiceScopeFactory scopeFactory,
     IServiceProvider serviceProvider,
