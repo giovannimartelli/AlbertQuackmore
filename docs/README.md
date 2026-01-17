@@ -1,6 +1,6 @@
-# ExpenseTracker WebApp
+# AlbertQuackmore WebApp
 
-This directory contains the Telegram WebApp files for ExpenseTracker bot.
+This directory contains the Telegram WebApp files for AlbertQuackmore bot.
 
 ## Files
 

@@ -2,8 +2,8 @@
 # deploy.sh
 
 # Build e push locale
-docker build -t giovannimartelli/expensetracker .
-docker push giovannimartelli/expensetracker
+docker build -t giovannimartelli/AlbertQuackmore .
+docker push giovannimartelli/AlbertQuackmore
 
 # Deploy su RPi
 ssh manager@ciaobubu.airdns.org -p 64703 << 'EOF'
